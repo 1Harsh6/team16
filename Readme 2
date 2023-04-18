@@ -1,0 +1,60 @@
+import os
+import google_auth_oauthlib.flow
+import googleapiclient.discovery
+import googleapiclient.errors
+
+# Set up the API credentials
+scopes = ["https://www.googleapis.com/auth/youtube.force-ssl"]
+api_service_name = "youtube"
+api_version = "v3"
+client_secrets_file = "client_secret.json"  # replace with your own credentials
+
+# Authenticate the API client
+flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
+    client_secrets_file, scopes
+)
+credentials = flow.run_local_server(port=0)
+
+# Create the API client
+youtube = googleapiclient.discovery.build(
+    api_service_name, api_version, credentials=credentials
+)
+
+# Define the video ID to analyze
+video_id = "VIDEO_ID"  # replace with your own video ID
+
+# Get the tags for the video
+tags_response = youtube.videos().list(
+    part="snippet",
+    id=video_id,
+).execute()
+
+video_tags = tags_response["items"][0]["snippet"]["tags"]
+
+# Search for videos using the tags
+search_response = youtube.search().list(
+    part="snippet",
+    maxResults=10,
+    order="viewCount",
+    q=",".join(video_tags),
+).execute()
+
+# Get the top-performing video's tags
+top_video_id = search_response["items"][0]["id"]["videoId"]
+top_tags_response = youtube.videos().list(
+    part="snippet",
+    id=top_video_id,
+).execute()
+
+top_video_tags = top_tags_response["items"][0]["snippet"]["tags"]
+
+# Identify differences in the tags
+new_tags = list(set(video_tags) - set(top_video_tags))
+missing_tags = list(set(top_video_tags) - set(video_tags))
+
+# Suggest changes to the tags
+if len(new_tags) > 0:
+    print(f"Add the following tags to improve performance: {', '.join(new_tags)}")
+
+if len(missing_tags) > 0:
+    print(f"Remove the following tags to improve performance: {', '.join(missing_tags)}")
